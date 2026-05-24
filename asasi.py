@@ -118,11 +118,11 @@ def _check_learning():
         learner.run(claude, send, decisions)
 
 
-def _run_agent_proposal(agent_name: str, intent: str, chat_id: str):
+def _run_agent_proposal(agent_name: str, intent: str, chat_id: str, complexity: str = "medium"):
     send(f"{agent_name} reading files...")
     send_typing()
     try:
-        proposal = agents.run_agent(agent_name, intent, claude)
+        proposal = agents.run_agent(agent_name, intent, claude, complexity)
         msg      = agents.format_proposal(proposal)
         _pending_proposal[chat_id] = proposal
         _save_json(_DATA_DIR / "pending_proposals.json", _pending_proposal)
@@ -173,7 +173,7 @@ def handle(text: str, chat_id: str):
         if chat_id in _pending_confirm:
             decision = _pending_confirm.pop(chat_id)
             _log(decision.get("agent"), decision.get("intent", ""), "cost_confirmed")
-            _run_agent_proposal(decision.get("agent"), decision.get("intent", text), chat_id)
+            _run_agent_proposal(decision.get("agent"), decision.get("intent", text), chat_id, decision.get("complexity", "medium"))
             return
         send("Nothing pending confirmation.")
         return
@@ -258,6 +258,7 @@ def handle(text: str, chat_id: str):
     agent_name = decision.get("agent", "NONE")
     intent     = decision.get("intent", text)
     cost       = float(decision.get("estimated_cost_usd") or 0.0)
+    complexity = decision.get("complexity", "medium")
 
     if agent_name != "NONE":
         if cost > config.cost_cap():
@@ -265,7 +266,7 @@ def handle(text: str, chat_id: str):
             send(f"Estimated cost ${cost:.2f} exceeds ${config.cost_cap():.2f} cap.\n/confirm to proceed | /cancel to abort")
         else:
             router.log_decision({**decision, "outcome": "running"})
-            _run_agent_proposal(agent_name, intent, chat_id)
+            _run_agent_proposal(agent_name, intent, chat_id, complexity)
     else:
         router.log_decision(decision)
         ask_claude(text)

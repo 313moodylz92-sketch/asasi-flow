@@ -60,9 +60,9 @@ def run(claude_client, send_fn, decisions: list) -> None:
 
     try:
         resp = claude_client.messages.create(
-            model="claude-sonnet-4-6",
+            model="claude-opus-4-7",
             max_tokens=1024,
-            system=LEARNING_SYSTEM,
+            system=[{"type": "text", "text": LEARNING_SYSTEM, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": prompt}],
         )
         raw = resp.content[0].text.strip()

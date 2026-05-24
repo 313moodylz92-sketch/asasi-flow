@@ -15,6 +15,12 @@ CONTENT_LOG = BASE_DIR / "content_log.json"
 MAX_FILE_CHARS = 4000
 MAX_FILES_READ = 4
 
+MODEL_HAIKU  = "claude-haiku-4-5-20251001"
+MODEL_SONNET = "claude-sonnet-4-6"
+
+def _model_for(complexity: str) -> str:
+    return MODEL_HAIKU if complexity == "simple" else MODEL_SONNET
+
 FILE_SELECTOR_SYSTEM = (
     "File selector. Given a list of files and a user intent, return ONLY a JSON array "
     "of the most relevant file paths (max {n}). No explanation."
@@ -108,7 +114,7 @@ def _get_approved_content(n: int = 5) -> str:
 
 # ── AGENT RUNNERS ─────────────────────────────────────────────────────────────
 
-def _run_code_agent(agent_cfg: dict, intent: str, claude_client) -> dict:
+def _run_code_agent(agent_cfg: dict, intent: str, claude_client, complexity: str = "medium") -> dict:
     base    = Path(agent_cfg["git_dir"]) if agent_cfg.get("git_dir") else BASE_DIR
     scopes  = agent_cfg.get("file_scope", [])
     all_files = _list_files(base, scopes)
@@ -122,12 +128,13 @@ def _run_code_agent(agent_cfg: dict, intent: str, claude_client) -> dict:
         files_read.append(rel)
 
     prompt = f"Intent: {intent}\n\nFile contents:{file_contents}"
+    model  = MODEL_SONNET  # always Sonnet for code — never downgrade writes
 
     try:
         resp = claude_client.messages.create(
-            model="claude-sonnet-4-6",
+            model=model,
             max_tokens=1024,
-            system=agent_cfg["system_prompt"],
+            system=[{"type": "text", "text": agent_cfg["system_prompt"], "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": prompt}],
         )
         proposal = _parse_json(resp.content[0].text)
@@ -149,12 +156,13 @@ def _run_code_agent(agent_cfg: dict, intent: str, claude_client) -> dict:
     return proposal
 
 
-def _run_report_agent(agent_cfg: dict, intent: str, claude_client) -> dict:
+def _run_report_agent(agent_cfg: dict, intent: str, claude_client, complexity: str = "medium") -> dict:
+    model = _model_for(complexity)
     try:
         resp = claude_client.messages.create(
-            model="claude-sonnet-4-6",
+            model=model,
             max_tokens=1024,
-            system=agent_cfg["system_prompt"],
+            system=[{"type": "text", "text": agent_cfg["system_prompt"], "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": f"Request: {intent}"}],
         )
         report = _parse_json(resp.content[0].text)
@@ -170,17 +178,18 @@ def _run_report_agent(agent_cfg: dict, intent: str, claude_client) -> dict:
     return report
 
 
-def _run_content_agent(agent_cfg: dict, intent: str, claude_client) -> dict:
+def _run_content_agent(agent_cfg: dict, intent: str, claude_client, complexity: str = "medium") -> dict:
     approved = _get_approved_content(5)
     prompt   = f"Content request: {intent}"
     if approved:
         prompt += f"\n\n{approved}"
 
+    model = _model_for(complexity)
     try:
         resp = claude_client.messages.create(
-            model="claude-sonnet-4-6",
+            model=model,
             max_tokens=1024,
-            system=agent_cfg["system_prompt"],
+            system=[{"type": "text", "text": agent_cfg["system_prompt"], "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": prompt}],
         )
         draft = _parse_json(resp.content[0].text)
@@ -198,7 +207,7 @@ def _run_content_agent(agent_cfg: dict, intent: str, claude_client) -> dict:
 
 # ── DISPATCHER ────────────────────────────────────────────────────────────────
 
-def run_agent(agent_name: str, intent: str, claude_client) -> dict:
+def run_agent(agent_name: str, intent: str, claude_client, complexity: str = "medium") -> dict:
     agents = config.load_agents()
     cfg    = next((a for a in agents if a["name"] == agent_name), None)
     if not cfg:
@@ -206,11 +215,11 @@ def run_agent(agent_name: str, intent: str, claude_client) -> dict:
 
     agent_type = cfg.get("type", "code")
     if agent_type == "code":
-        return _run_code_agent(cfg, intent, claude_client)
+        return _run_code_agent(cfg, intent, claude_client, complexity)
     elif agent_type == "report":
-        return _run_report_agent(cfg, intent, claude_client)
+        return _run_report_agent(cfg, intent, claude_client, complexity)
     elif agent_type == "content":
-        return _run_content_agent(cfg, intent, claude_client)
+        return _run_content_agent(cfg, intent, claude_client, complexity)
     return {"agent": agent_name, "intent": intent, "error": f"Unknown agent type: {agent_type}"}
 
 

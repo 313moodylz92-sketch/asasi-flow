@@ -53,9 +53,11 @@ def _build_system(agents: list, rules: dict) -> str:
         '  "agent": "<agent name> or NONE",\n'
         '  "intent": "one sentence: what the user wants done",\n'
         '  "confidence": 0-100,\n'
-        '  "estimated_cost_usd": 0.10\n'
+        '  "estimated_cost_usd": 0.10,\n'
+        '  "complexity": "simple|medium|complex"\n'
         '}\n'
-        'estimated_cost_usd: reads=$0.10, writes=$0.25, complex=$0.75, research=$0.50'
+        'estimated_cost_usd: reads=$0.10, writes=$0.25, complex=$0.75, research=$0.50\n'
+        'complexity: simple=quick question/small read, medium=multi-file/analysis, complex=large codebase/deep reasoning'
     )
     return "\n".join(lines)
 
@@ -84,7 +86,7 @@ def route(user_text: str, claude_client) -> dict:
         resp = claude_client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=256,
-            system=system,
+            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_text}],
         )
         raw = resp.content[0].text.strip()

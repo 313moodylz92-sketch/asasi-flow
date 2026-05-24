@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+.asasi_bak/
+decisions.json
+routing_rules.json
+content_log.json
+pending_proposals.json
+pending_executions.json
+last_staged.json
+*.log
+.DS_Store

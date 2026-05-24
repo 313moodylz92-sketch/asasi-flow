@@ -257,7 +257,7 @@ def handle(text: str, chat_id: str):
     decision   = router.route(text, claude)
     agent_name = decision.get("agent", "NONE")
     intent     = decision.get("intent", text)
-    cost       = decision.get("estimated_cost_usd", 0.0)
+    cost       = float(decision.get("estimated_cost_usd") or 0.0)
 
     if agent_name != "NONE":
         if cost > config.cost_cap():
@@ -285,7 +285,10 @@ def main():
             chat_id = str(msg.get("chat", {}).get("id", ""))
             text    = msg.get("text", "")
             if chat_id == CHAT_ID and text:
-                handle(text, chat_id)
+                try:
+                    handle(text, chat_id)
+                except Exception as e:
+                    send(f"Internal error: {e}")
         time.sleep(1)
 
 

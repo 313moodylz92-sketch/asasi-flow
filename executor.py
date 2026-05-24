@@ -116,11 +116,16 @@ def confirm(bundle: dict) -> tuple:
         bak.write_text(f["original"], encoding="utf-8")
         full.write_text(f["new_content"], encoding="utf-8")
 
-        result = subprocess.run(
-            ["git", "add", str(full)],
-            cwd=git_dir, capture_output=True, text=True,
-        )
-        if result.returncode == 0:
+        try:
+            result = subprocess.run(
+                ["git", "add", str(full)],
+                cwd=git_dir, capture_output=True, text=True, timeout=30,
+            )
+            ok = result.returncode == 0
+        except subprocess.TimeoutExpired:
+            ok = False
+            result = type("R", (), {"stderr": "git timed out"})()
+        if ok:
             staged.append({"path": f["path"], "full_path": str(full),
                            "bak": str(bak), "git_dir": git_dir})
         else:
@@ -150,7 +155,7 @@ def rollback(staged: list) -> str:
             if bak.exists():
                 full.write_text(bak.read_text(encoding="utf-8"), encoding="utf-8")
             subprocess.run(["git", "restore", "--staged", str(full)],
-                           cwd=s["git_dir"], capture_output=True)
+                           cwd=s["git_dir"], capture_output=True, timeout=30)
             lines.append(f"Restored: {s['path']}")
         except Exception as e:
             lines.append(f"Rollback failed on {s['path']}: {e}")

@@ -1,28 +1,68 @@
 # ASASI Flow
 
-**Telegram-native multi-agent system. Define your agents in YAML. It learns from your decisions.**
+**A Telegram-native control layer for local AI agents.**
 
-Built in a weekend while trading prediction markets and launching a product marketplace. Not a spec doc. Not vaporware. Running in production.
+Define agents in YAML. Send tasks from Telegram. Review the plan. Approve the diff. Confirm before anything writes. Roll back if needed.
+
+Built for solo builders who want AI coding help without giving agents unsupervised control over their repo.
 
 ---
 
-## What makes it different
+## The problem it solves
 
-Every other multi-agent framework either:
-- Has a "learning system" that's actually `Math.random() > 0.5`
-- Requires you to write Python to define agents
-- Has no approval gate — agents just run and you find out what happened
+Most agent frameworks either run autonomously (you find out what happened after) or require you to babysit a terminal. ASASI Flow sits in the middle: agents propose, you control, files only write when you say so — from Telegram.
 
-ASASI Flow has three things none of them do:
+Control coding agents from Telegram without giving them unsupervised write access.
 
-**1. Two-step approval gate**
-Agents propose, you see the exact code diff in Telegram before a single file is written. You type `/confirm` to stage. You type `/veto` to kill it. Nothing writes without your eyes on it.
+---
 
-**2. Real learning loop**
-Every approve and veto is logged. After 50 decisions, Claude reads the full log, finds the patterns, and rewrites the routing rules. Your system gets smarter from your actual behavior — not a pretrained dataset.
+## Safety model
 
-**3. YAML-defined agents**
-No Python required to add or modify agents. Define them in `agents.yaml`. Three types: `code` (reads files, proposes changes, stages), `report` (research and analysis), `content` (drafts, saves approved posts for voice consistency).
+- Only responds to your configured `TELEGRAM_CHAT_ID`
+- Agents only write after `/confirm`
+- Shows unified diff before any file is touched
+- Creates `.bak` backup before every write
+- `/rollback` restores instantly
+- Code agents restricted to `file_scope` in their config
+- Never auto-pushes to GitHub
+- Never executes shell commands
+- `.env` and all runtime state excluded from git
+
+---
+
+## How it works
+
+```
+You type anything in Telegram
+        ↓
+Router (Claude Haiku) classifies intent → picks agent
+        ↓
+Agent reads relevant files → proposes a plan
+        ↓
+/approve → agent generates code → sends diff to Telegram
+        ↓
+/confirm → files written + backed up + git staged
+        ↓
+Decision logged → routing adapts from your approvals/vetoes
+```
+
+Every staged file has a `.bak` backup. `/rollback` restores instantly.
+
+---
+
+## What makes it work
+
+**Telegram-native control**
+No dashboard, no terminal babysitting. You're on your phone. You type a task. You see the plan. You approve the diff. The file writes. That's the full loop.
+
+**Two-step write gate**
+Agents propose, then generate code. You see the exact diff before a single file is written. `/confirm` stages it. `/veto` kills it. Nothing writes without your sign-off.
+
+**YAML-defined agents**
+No Python required to add or modify agents. Define them in `agents.yaml` — name, file scope, system prompt, git directory. Three types: `code` (reads files, proposes changes, stages on confirm), `report` (research and analysis), `content` (drafts, saves approved posts for voice consistency).
+
+**Routing adaptation**
+ASASI logs every approval and veto. After 50 decisions, it asks Claude to rewrite the routing rules based on your actual behavior. It does not fine-tune a model. It updates inspectable JSON rules that the router picks up on the next message. Trigger manually anytime with `/learn`.
 
 ---
 
@@ -69,26 +109,6 @@ Open Telegram. Type anything. It routes to the right agent automatically.
 
 ---
 
-## How it works
-
-```
-You type anything in Telegram
-        ↓
-Router (Claude Haiku) classifies intent → picks agent
-        ↓
-Agent reads relevant files → proposes a plan
-        ↓
-/approve → agent generates code → sends diff to Telegram
-        ↓
-/confirm → files written + backed up + git staged
-        ↓
-Decision logged → at 50 entries → learning loop rewrites routing rules
-```
-
-Every staged file has a `.bak` backup. `/rollback` restores instantly.
-
----
-
 ## Agent types
 
 | Type | What it does | On /approve |
@@ -107,22 +127,10 @@ Every staged file has a `.bak` backup. `/rollback` restores instantly.
 | `/confirm` | Write + stage files after reviewing diff |
 | `/veto` | Discard proposal or diff. Logs as vetoed. |
 | `/rollback` | Restore last staged files from backup, unstage from git |
-| `/agent` | System status — decisions logged, routing rules version, learning progress |
+| `/agent` | System status — decisions logged, routing rules version, adaptation progress |
 | `/log` | Last 5 routing decisions |
-| `/learn` | Trigger learning loop manually |
+| `/learn` | Trigger routing adaptation manually |
 | `/reset` | Clear conversation history |
-
----
-
-## The learning loop
-
-After 50 decisions (approvals + vetoes), ASASI Flow automatically:
-1. Reads the full decision log
-2. Analyzes which agents were approved vs vetoed
-3. Identifies misrouting patterns
-4. Rewrites routing descriptions in `routing_rules.json`
-
-The router picks up the new rules on the next message. No restart needed. Trigger it manually anytime with `/learn`.
 
 ---
 
@@ -136,4 +144,4 @@ The router picks up the new rules on the next message. No restart needed. Trigge
 
 ## Built by
 
-[THOWBA Holdings](https://thowba.com) — built live while running [313SESSIONS](https://313sessions.com)
+[THOWBA Holdings](https://thowba.com) — built live while trading prediction markets and launching a product marketplace. Running in production.

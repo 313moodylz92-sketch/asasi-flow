@@ -1,6 +1,8 @@
 # ASASI Flow
 
-**A Telegram-native control layer for local AI agents.**
+A Telegram-native control layer for local AI agents.
+
+ASASI means foundation. This is the control foundation for human-approved AI agent work.
 
 Define agents in YAML. Send tasks from Telegram. Review the plan. Approve the diff. Confirm before anything writes. Roll back if needed.
 
@@ -16,13 +18,24 @@ Control coding agents from Telegram without giving them unsupervised write acces
 
 ---
 
+## What ASASI is not
+
+- Not an autonomous coding agent
+- Not a hosted SaaS
+- Not a replacement for code review
+- Not a shell-execution agent
+- Not a multi-user permissions system
+- Not safe to point at sensitive repos without reviewing file scopes
+
+---
+
 ## Safety model
 
 - Only responds to your configured `TELEGRAM_CHAT_ID`
 - Agents only write after `/confirm`
 - Shows unified diff before any file is touched
 - Creates `.bak` backup before every write
-- `/rollback` restores instantly
+- `/rollback` restores the last staged change from backup
 - Code agents restricted to `file_scope` in their config
 - Never auto-pushes to GitHub
 - Never executes shell commands
@@ -46,14 +59,14 @@ Agent reads relevant files → proposes a plan
 Decision logged → routing adapts from your approvals/vetoes
 ```
 
-Every staged file has a `.bak` backup. `/rollback` restores instantly.
+Every staged file has a `.bak` backup. `/rollback` restores the last staged change from backup.
 
 ---
 
 ## What makes it work
 
 **Telegram-native control**
-No dashboard, no terminal babysitting. You're on your phone. You type a task. You see the plan. You approve the diff. The file writes. That's the full loop.
+No dashboard, no terminal babysitting. You're on your phone. You type a task. You see the plan. You approve the diff. The change writes. That's the full loop.
 
 **Two-step write gate**
 Agents propose, then generate code. You see the exact diff before a single file is written. `/confirm` stages it. `/veto` kills it. Nothing writes without your sign-off.
@@ -63,6 +76,16 @@ No Python required to add or modify agents. Define them in `agents.yaml` — nam
 
 **Routing adaptation**
 ASASI logs every approval and veto. After 50 decisions, it asks Claude to rewrite the routing rules based on your actual behavior. It does not fine-tune a model. It updates inspectable JSON rules that the router picks up on the next message. Trigger manually anytime with `/learn`.
+
+---
+
+## Requirements
+
+- Python 3.10+
+- Git installed
+- Telegram bot token
+- Anthropic API key
+- A local codebase path
 
 ---
 
@@ -126,7 +149,7 @@ Open Telegram. Type anything. It routes to the right agent automatically.
 | `/approve` | Accept proposal → generate code diff (code agents) or approve directly (report/content) |
 | `/confirm` | Write + stage files after reviewing diff |
 | `/veto` | Discard proposal or diff. Logs as vetoed. |
-| `/rollback` | Restore last staged files from backup, unstage from git |
+| `/rollback` | Restore last staged change from backup, unstage from git |
 | `/agent` | System status — decisions logged, routing rules version, adaptation progress |
 | `/log` | Last 5 routing decisions |
 | `/learn` | Trigger routing adaptation manually |
@@ -136,9 +159,11 @@ Open Telegram. Type anything. It routes to the right agent automatically.
 
 ## Cost
 
+Cost varies by model, repo size, files read, and diff size. Small commands are usually cheap, but ASASI includes a default $3 cap per command and asks before exceeding it.
+
+Approximate examples (Anthropic pricing is the source of truth):
 - Routing: Claude Haiku (~$0.0002 per message)
 - Proposals + execution: Claude Sonnet (~$0.10–$0.75 per command)
-- Default $3 cap per command — asks confirmation above that
 
 ---
 

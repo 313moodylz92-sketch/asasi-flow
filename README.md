@@ -30,7 +30,7 @@ No Python required to add or modify agents. Define them in `agents.yaml`. Three 
 
 **1. Clone and install**
 ```bash
-git clone https://github.com/thowba/asasi-flow
+git clone https://github.com/313moodylz92-sketch/asasi-flow
 cd asasi-flow
 pip install anthropic python-dotenv pyyaml requests
 ```

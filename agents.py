@@ -21,6 +21,20 @@ MODEL_SONNET = "claude-sonnet-4-6"
 def _model_for(complexity: str) -> str:
     return MODEL_HAIKU if complexity == "simple" else MODEL_SONNET
 
+
+def _create_with_fallback(client, model: str, fallback, max_tokens: int, system, messages):
+    try:
+        return client.messages.create(
+            model=model, max_tokens=max_tokens, system=system, messages=messages
+        )
+    except Exception as e:
+        if fallback and any(x in str(e).lower() for x in ("model", "invalid", "not found", "unsupported")):
+            return client.messages.create(
+                model=fallback, max_tokens=max_tokens, system=system, messages=messages
+            )
+        raise
+
+
 FILE_SELECTOR_SYSTEM = (
     "File selector. Given a list of files and a user intent, return ONLY a JSON array "
     "of the most relevant file paths (max {n}). No explanation."
@@ -131,8 +145,8 @@ def _run_code_agent(agent_cfg: dict, intent: str, claude_client, complexity: str
     model  = MODEL_SONNET  # always Sonnet for code — never downgrade writes
 
     try:
-        resp = claude_client.messages.create(
-            model=model,
+        resp = _create_with_fallback(
+            claude_client, model, None,
             max_tokens=1024,
             system=[{"type": "text", "text": agent_cfg["system_prompt"], "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": prompt}],
@@ -157,10 +171,11 @@ def _run_code_agent(agent_cfg: dict, intent: str, claude_client, complexity: str
 
 
 def _run_report_agent(agent_cfg: dict, intent: str, claude_client, complexity: str = "medium") -> dict:
-    model = _model_for(complexity)
+    model    = _model_for(complexity)
+    fallback = MODEL_HAIKU if model == MODEL_SONNET else None
     try:
-        resp = claude_client.messages.create(
-            model=model,
+        resp = _create_with_fallback(
+            claude_client, model, fallback,
             max_tokens=1024,
             system=[{"type": "text", "text": agent_cfg["system_prompt"], "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": f"Request: {intent}"}],
@@ -184,10 +199,11 @@ def _run_content_agent(agent_cfg: dict, intent: str, claude_client, complexity: 
     if approved:
         prompt += f"\n\n{approved}"
 
-    model = _model_for(complexity)
+    model    = _model_for(complexity)
+    fallback = MODEL_HAIKU if model == MODEL_SONNET else None
     try:
-        resp = claude_client.messages.create(
-            model=model,
+        resp = _create_with_fallback(
+            claude_client, model, fallback,
             max_tokens=1024,
             system=[{"type": "text", "text": agent_cfg["system_prompt"], "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": prompt}],

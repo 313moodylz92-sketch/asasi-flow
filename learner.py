@@ -59,12 +59,24 @@ def run(claude_client, send_fn, decisions: list) -> None:
     )
 
     try:
-        resp = claude_client.messages.create(
-            model="claude-opus-4-7",
-            max_tokens=1024,
-            system=[{"type": "text", "text": LEARNING_SYSTEM, "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": prompt}],
-        )
+        try:
+            resp = claude_client.messages.create(
+                model="claude-opus-4-7",
+                max_tokens=1024,
+                system=[{"type": "text", "text": LEARNING_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except Exception as e:
+            if any(x in str(e).lower() for x in ("model", "invalid", "not found", "unsupported")):
+                resp = claude_client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=1024,
+                    system=[{"type": "text", "text": LEARNING_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+                    messages=[{"role": "user", "content": prompt}],
+                )
+            else:
+                raise
+
         raw = resp.content[0].text.strip()
         raw = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
         updates = json.loads(raw)
@@ -73,8 +85,14 @@ def run(claude_client, send_fn, decisions: list) -> None:
         new_rules.update(updates)
         new_rules["version"] = current.get("version", 1) + 1
         new_rules["updated"] = datetime.utcnow().isoformat()[:10]
-        router.save_rules(new_rules)
 
+        if router.RULES_FILE.exists():
+            ts  = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            bak = router.RULES_FILE.parent / f"routing_rules_v{current.get('version', 1)}_{ts}.bak.json"
+            bak.write_text(router.RULES_FILE.read_text())
+            send_fn(f"Backup: {bak.name}")
+
+        router.save_rules(new_rules)
         send_fn(
             f"Routing rules updated to v{new_rules['version']}.\n\n"
             f"Changes: {updates.get('notes', 'No notes.')}"

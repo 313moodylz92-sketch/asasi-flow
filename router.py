@@ -75,6 +75,24 @@ def save_rules(rules: dict) -> None:
     RULES_FILE.write_text(json.dumps(rules, indent=2))
 
 
+# ── COMPLEXITY CLAMP ─────────────────────────────────────────────────────────
+
+_CODE_KEYWORDS = frozenset({
+    "code", "file", "files", "repo", "patch", "fix", "debug", "error",
+    "stack", "deploy", "refactor", "api", "database", "db", "config",
+    "test", "tests", "function", "class", "component",
+    "schema", "migration", "import", "export", "build", "script",
+    "bug", "crash", "broke", "broken",
+})
+
+def _clamp_complexity(decision: dict, user_text: str = "") -> dict:
+    if decision.get("complexity") == "simple":
+        haystack = (user_text + " " + decision.get("intent", "")).lower()
+        if any(kw in haystack for kw in _CODE_KEYWORDS):
+            decision["complexity"] = "medium"
+    return decision
+
+
 # ── ROUTE ─────────────────────────────────────────────────────────────────────
 
 def route(user_text: str, claude_client) -> dict:
@@ -102,7 +120,7 @@ def route(user_text: str, claude_client) -> dict:
     decision["input"]     = user_text
     decision["timestamp"] = datetime.utcnow().isoformat() + "Z"
     decision["outcome"]   = "routed"
-    return decision
+    return _clamp_complexity(decision, user_text)
 
 
 # ── STATUS ────────────────────────────────────────────────────────────────────

@@ -116,21 +116,23 @@ def confirm(bundle: dict) -> tuple:
         bak.write_text(f["original"], encoding="utf-8")
         full.write_text(f["new_content"], encoding="utf-8")
 
+        git_err = ""
         try:
             result = subprocess.run(
                 ["git", "add", str(full)],
                 cwd=git_dir, capture_output=True, text=True, timeout=30,
             )
-            ok = result.returncode == 0
+            ok      = result.returncode == 0
+            git_err = result.stderr.strip() if not ok else ""
         except subprocess.TimeoutExpired:
-            ok = False
-            result = type("R", (), {"stderr": "git timed out"})()
+            ok      = False
+            git_err = "git timed out after 30s"
         if ok:
             staged.append({"path": f["path"], "full_path": str(full),
                            "bak": str(bak), "git_dir": git_dir})
         else:
             full.write_text(f["original"], encoding="utf-8")
-            errors.append(f"git add failed on {f['path']}: {result.stderr.strip()}")
+            errors.append(f"git add failed on {f['path']}: {git_err}")
 
     lines = []
     if staged:
